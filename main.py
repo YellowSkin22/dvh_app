@@ -27,9 +27,15 @@ transactions_df = pd.read_csv(transactions_url,
 member_mutations_url = 'https://raw.githubusercontent.com/YellowSkin22/dvh_app/main/data/member_mutation_summary.csv'
 member_mutations_df = pd.read_csv(member_mutations_url)
 
+memberconversions_url = 'https://raw.githubusercontent.com/YellowSkin22/dvh_app/main/data/member_conversion.csv'
+memberconversions_df = pd.read_csv(memberconversions_url)
+
+
 
 ## -- DataFrame CleanUp -- ##
-
+transactions_df['Saldo na trn'] = transactions_df['Saldo na trn'].str.replace('+', '')
+transactions_df['Saldo na trn'] = transactions_df['Saldo na trn'].str.replace(',', '.')
+transactions_df['Saldo na trn'] = transactions_df['Saldo na trn'].astype(float)
 
 ### --- Metric Variables --- ###
 ## -- Member Count -- ##
@@ -46,11 +52,16 @@ current_membercount = original_membercount + mutations_total
 memberchart_df = member_mutations_df[['date', 'balance']]
 memberchart_df['date'] = memberchart_df['date'].str[3:]
 
+## -- Member Conversion -- ## 
+conversion_2021 = round((10/31) * 100, 2)
+conversion_2022 = round((memberconversions_df.membership_y.count() / memberconversions_df.age.count()) * 100 , 2)
+
+conversion_delta = conversion_2022 - conversion_2021
+
+
+
 ## -- Bank Account Balance -- ##
 account_balance = transactions_df['Saldo na trn'].iloc[-1]
-account_balance = account_balance.replace('+', '')
-account_balance = account_balance.replace(',', '.')
-account_balance = float(account_balance)
 
 last_account_date = transactions_df['Datum'].iloc[-1]
 
@@ -76,12 +87,40 @@ x = memberchart_df.date
 y = memberchart_df.balance
 
 fig1, ax1 = plt.subplots(figsize=(14, 4), layout='constrained')
-ax1.plot(x, y, label='member count')  # Plot some data on the axes.
+
+ax1.plot(x, y, label='member count', marker='o')  # Plot some data on the axes.
+
+for x, y in zip(x, y):
+    label = y
+    plt.annotate(label, (x, y),
+                 xycoords="data",
+                 textcoords="offset points",
+                 xytext=(0, 10), ha="center")
+
 ax1.set_ylabel('member count')  # Add a y-label to the axes.
 ax1.tick_params(rotation=30, axis='x')  # rotate xticks
+ax1.set_ylim([220, 250])
 
 buf1 = BytesIO()
 fig1.savefig(buf1, format="png")
+
+# - fig2: Cash Flow Chart - #
+
+cashflowchart_df = transactions_df.groupby('Datum', as_index=False)['Saldo na trn'].last()
+
+x = cashflowchart_df['Datum']
+y = cashflowchart_df['Saldo na trn']
+
+fig2, ax2 = plt.subplots(figsize=(14, 4), layout='constrained')
+
+ax2.plot(x, y, label='Cash flow')  # Plot some data on the axes.
+
+
+ax2.set_ylabel('Cash Flow')  # Add a y-label to the axes.
+ax2.tick_params(rotation=30, axis='x')  # rotate xticks
+
+buf2= BytesIO()
+fig2.savefig(buf2, format="png")
 
 
 
@@ -112,7 +151,7 @@ with col2:
 
 
 ## -- Tabs -- ##
-tab1, tab2, tab3 = st.tabs(['Member Count', 'Cashflow', 'TBD'])
+tab1, tab2, tab3 = st.tabs(['Member Count', 'Cashflow', 'P&L'])
 
 with tab1:
     st.header(':couple: Member Progression')
@@ -128,11 +167,11 @@ with tab1:
                   help='Last update: {}'.format(last_member_date))
         
         st.metric(label='Conversion Rate',
-                  value=0,
-                  delta=-1,
+                  value='{} %'.format(conversion_2022),
+                  delta=conversion_delta,
                   help='Last update: {}'.format('tbd'))
         
-        st.metric(label='Conversion Rate',
+        st.metric(label='TBD',
                   value=0,
                   delta=-1,
                   help='Last update: {}'.format('tbd'))
@@ -143,8 +182,7 @@ with tab1:
     
     
 with tab2:
-    st.write(transactions_df)
-    st.write(account_balance)
+    st.image(buf2)
     
     
     
