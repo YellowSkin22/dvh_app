@@ -8,11 +8,8 @@ Created on Tue Aug  2 08:24:01 2022
 ### --- Libraries --- ### 
 import streamlit as st
 import pandas as pd
-# from datetime import date
-# import numpy as np
 import matplotlib.pyplot as plt
 from io import BytesIO
-# import matplotlib as mpl
 
 ### --- Functions --- ### 
 
@@ -45,32 +42,50 @@ def check_password():
         return True
     
     
+    
+### --- DataFrame Work --- ###
+
+
+# - Transactions DataFrame - #
+transactions_url = 'https://raw.githubusercontent.com/YellowSkin22/dvh_app/main/data/bankrekening_2022.csv'
+transactions_df = pd.read_csv(transactions_url,
+                              sep=',',
+                              encoding='latin-1')
+
+transactions_df['Saldo na trn'] = transactions_df['Saldo na trn'].str.replace('+', '') # Replace '+' with blanks
+transactions_df['Saldo na trn'] = transactions_df['Saldo na trn'].str.replace(',', '.') # Replace ',' with '.' 
+transactions_df['Saldo na trn'] = transactions_df['Saldo na trn'].astype(float) # Set datatype float
+
+transactions_df['Datum'] = transactions_df['Datum'].astype('datetime64[ns]') # Set datatype to datetime
+
+
+
+
+
+    
 
 
 if check_password():
 
-    ### --- Relevant URLS --- ### 
-    # https://www.webfx.com/tools/emoji-cheat-sheet/
-    # https://raw.githubusercontent.com/YellowSkin22/dvh_app/main/data/bankrekening_2022.csv
     
     ### --- DataFrame Work --- ###
-    transactions_url = 'https://raw.githubusercontent.com/YellowSkin22/dvh_app/main/data/bankrekening_2022.csv'
-    transactions_df = pd.read_csv(transactions_url,
-                                  sep=',',
-                                  encoding='latin-1')
+
     
     member_mutations_url = 'https://raw.githubusercontent.com/YellowSkin22/dvh_app/main/data/member_mutation_summary.csv'
     member_mutations_df = pd.read_csv(member_mutations_url)
     
+    
+    member_mutations_df['date'] = pd.to_datetime(member_mutations_df['date'],
+                                                 format='%d/%m/%Y')
+    
+     
     memberconversions_url = 'https://raw.githubusercontent.com/YellowSkin22/dvh_app/main/data/member_conversion.csv'
     memberconversions_df = pd.read_csv(memberconversions_url)
     
     
     
     ## -- DataFrame CleanUp -- ##
-    transactions_df['Saldo na trn'] = transactions_df['Saldo na trn'].str.replace('+', '')
-    transactions_df['Saldo na trn'] = transactions_df['Saldo na trn'].str.replace(',', '.')
-    transactions_df['Saldo na trn'] = transactions_df['Saldo na trn'].astype(float)
+
     
     ### --- Metric Variables --- ###
     ## -- Member Count -- ##
@@ -83,9 +98,12 @@ if check_password():
     
     mutations_total = member_mutations_df['mutations'].sum()
     current_membercount = original_membercount + mutations_total
+    target_membercount = round(228 * 1.1)
     
-    memberchart_df = member_mutations_df[['date', 'balance']]
-    memberchart_df['date'] = memberchart_df['date'].str[3:]
+    mutations_2022_df = member_mutations_df[member_mutations_df.date.dt.year == 2022]
+    total_mutations_2022 = mutations_2022_df.cumulative.sum()
+
+    
     
     ## -- Member Conversion -- ## 
     conversion_2021 = round((10/31) * 100, 2)
@@ -118,28 +136,32 @@ if check_password():
     
     # - fig1: Member Line Chart - #
     
-    x = memberchart_df.date
-    y = memberchart_df.balance
+    x = member_mutations_df.date
+    y = member_mutations_df.balance
     
     fig1, ax1 = plt.subplots(figsize=(14, 4), layout='constrained')
     
     ax1.plot(x, y, label='member count', marker='o')  # Plot some data on the axes.
     
+    
+    
+    ax1.plot(member_mutations_df['date'].iloc[-1], target_membercount, label='Target', marker='o')
+    
     for x, y in zip(x, y):
         label = y
         plt.annotate(label, (x, y),
-                     xycoords="data",
-                     textcoords="offset points",
-                     xytext=(0, 10), ha="center")
+                      xycoords="data",
+                      textcoords="offset points",
+                      xytext=(0, 10), ha="center")
     
     ax1.set_ylabel('member count')  # Add a y-label to the axes.
     ax1.tick_params(rotation=30, axis='x')  # rotate xticks
-    ax1.set_ylim([220, 250])
+    ax1.set_ylim([220, 255])
     
     buf1 = BytesIO()
     fig1.savefig(buf1, format="png")
     
-    # - fig2: Cash Flow Chart - #
+    # # - fig2: Cash Flow Chart - #
     
     cashflowchart_df = transactions_df.groupby('Datum', as_index=False)['Saldo na trn'].last()
     
@@ -193,27 +215,29 @@ if check_password():
         st.caption("""Voortgang op aantallen leden op basis van totalen. Conversion rate is op basis van leden die lid worden na een proeftraining.""")
         
         
-        col1, col2 = st.columns([1,4])
-        
+        col1, col2, col3 = st.columns(3)
+    
         with col1:
-            st.metric(label='Member Count',
-                      value=current_membercount,
-                      delta=None,
+            st.metric(label='🚀 Target',
+                      value= current_membercount,
+                      delta= float(current_membercount - target_membercount),
                       help='Last update: {}'.format(last_member_date))
             
-            st.metric(label='Conversion Rate',
+        with col2:            
+            st.metric(label='🥎 Conversion Rate',
                       value='{} %'.format(conversion_2022),
                       delta=conversion_delta,
                       help='Last update: {}'.format('tbd'))
             
-            st.metric(label='TBD',
-                      value=0,
-                      delta=-1,
-                      help='Last update: {}'.format('tbd'))
+        with col3:          
+            st.metric(label='🏋️‍♀️ Growth YTD',
+                      value=int(total_mutations_2022),
+                      delta=int(total_mutations_2022),
+                      help='Total change in membercount YTD')
         
+        # exit columns
         
-        with col2:
-            st.image(buf1)
+        st.image(buf1)
         
         
     with tab2:
