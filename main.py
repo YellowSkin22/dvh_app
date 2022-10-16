@@ -219,7 +219,7 @@ if check_password():
     
         with col1:
             st.metric(label='🚀 Target',
-                      value= current_membercount,
+                      value= target_membercount,
                       delta= float(current_membercount - target_membercount),
                       help='Last update: {}'.format(last_member_date))
             
